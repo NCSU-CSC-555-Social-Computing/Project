@@ -18,10 +18,7 @@ i = 0
 network_nodes = []
 for tn in trans_nodes[i:i+8]:
     network_nodes.append(transaction_network[transaction_network['Source'] == tn])
-    
-    
-    
-    
+
 # Trust Networks
 trust_network = pd.read_csv('../datasets/interpolation/masterEdgeList.csv', header=None)
 trust_network.columns = ['from','to','weight']
@@ -47,4 +44,19 @@ options = {
 nx.draw(G, nx.circular_layout(G), with_labels = True, edge_color=weights, edge_cmap=plt.cm.Blues, arrows=True,  **options)
 plt.show() # display
 
+
+categories = set(transaction_network['Transaction_Type'])
+default_attrs = {}
+for cat in categories:
+    default_attrs[cat] = 0
+    
+all_attrs = {}
+for i in range(1,8+1):
+    node_params = default_attrs
+    all_attrs[i] = {}
+    for cat in categories:
+        node_params[cat] = network_nodes[i-1][[network_nodes[i-1]['Transaction_Type']=='food'][0]]['Weight'][i-1]
+    all_attrs[i] = node_params
+
+nx.set_node_attributes(G, all_attrs)
 
