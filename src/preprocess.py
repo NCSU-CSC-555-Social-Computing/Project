@@ -16,21 +16,36 @@ def main():
         
         # use pandas to read the csv file as dataFrames
         dataset = pd.read_csv(basePath + unprocessedFile)
-        
-        i = 0
-        new_dataset = []
-        while(i<len(dataset)):
-            new_row = []
-            for col in dataset.columns:
-                avg = round((dataset[col][i]+dataset[col][i+1]+dataset[col][i+2])/3,2)
-                new_row.append(avg)
-            new_dataset.append(new_row)
-            new_row[0] = int(i/3)
-            i += 3
-        new_dataset = (pd.DataFrame(new_dataset))
-        new_dataset.columns = dataset.columns
-        new_dataset.to_csv('../datasets/processed/processed_'+unprocessedFile)
+                
+        time = getTimeForAggregation()
 
+        new_dataset = aggregateDataset(dataset, time)
+        
+        saveDatasetToCsv(new_dataset, '../datasets/processed/processed_'+unprocessedFile)
+
+def saveDatasetToCsv(dataset, filePath):
+    dataset.to_csv(filePath)
+
+def aggregateDataset(dataset, time):
+    i = 0
+    new_dataset = []
+    while(i<len(dataset)):
+        new_row = []
+        for col in dataset.columns:
+            avg = round(dataset.loc[i: i+time-1, col].sum()/(time), 2)
+            # avg = round((dataset[col][i]+dataset[col][i+1]+dataset[col][i+2])/3,2)
+            new_row.append(avg)
+        new_dataset.append(new_row)
+        new_row[0] = int(i/time)
+        i += time
+    new_dataset = (pd.DataFrame(new_dataset))
+    new_dataset.columns = dataset.columns
+    return new_dataset
+
+
+def getTimeForAggregation():
+    # Aggregating at a minute level
+    return 3*60
 
 def getFilesFromFilePath(filePath):
     files = os.listdir(filePath)
