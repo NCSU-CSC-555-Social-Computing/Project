@@ -12,8 +12,15 @@ import sys
 import numpy as np
 import random
 
+from scipy.sparse import lil_matrix
+from scipy.sparse import csr_matrix
+from scipy.sparse import diags
+from scipy.sparse import eye
+from scipy.sparse.linalg import spsolve
+
+
 def main():
-    categoryValue = sys.argv[1]
+    categoryValue = 'fashion'
     
     if categoryValue == "":
         print("Please enter category value as input while running the file")
@@ -48,7 +55,6 @@ def main():
     for tn in new_trans_nodes:
         network_nodes.append(transaction_network[transaction_network['Source'] == tn])
 
-    
     trust_edges = []
     for i in range(1,ma+1):
         tr_edge = pd.DataFrame(trust_network[trust_network['from']==i])
@@ -107,6 +113,7 @@ def main():
 def hypothesis2(influentialSubgraph, categoryValue):
     nodes = list(influentialSubgraph.nodes())
     # print(nodes)
+    G1 = influentialSubgraph.copy()
     for i in range(len(nodes)-1):
         source = nodes[i]
         target = nodes[i+1]
@@ -116,6 +123,11 @@ def hypothesis2(influentialSubgraph, categoryValue):
     
     visualizeNetworkXGraph(influentialSubgraph, "graph_canvas_before_h2.png")
     hypothesis1(influentialSubgraph, categoryValue)
+    G2 = influentialSubgraph.copy()
+    print(G1)
+    print(G2)
+    similarity = deltacon(G1, G2)
+    print(similarity)
     visualizeNetworkXGraph(influentialSubgraph, "graph_canvas_after_h2.png")
 
 def visualizeNetworkXGraph(G, fileName):
@@ -157,7 +169,7 @@ def hypothesis1(G, categoryValue):
                 
                 # update the knowledge of the neighbor node
                 updateNodeKnowledgeForCategory(G, neighbor, knowledgeImpactFactor, sourceKnowledge, destinationKnowledge, categoryValue)
-        print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")   
+        #print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")   
     return
 
 
@@ -171,8 +183,59 @@ def updateNodeKnowledgeForCategory(G, neighbor, knowledgeImpactFactor, sourceKno
 def updateEdgeInformation(G, sourceNodeId, neighbor, knowledgeImpactFactor, sourceKnowledge, destinationKnowledge):
     # formula for updating the edge weight is 
     # Wtrust = Wtrust + (knowledgeImpactFactor) * (absolute change in knowledge)
-    G[sourceNodeId][neighbor]["weight"] += (knowledgeImpactFactor) * (abs(sourceKnowledge - destinationKnowledge))
+    #G[sourceNodeId][neighbor]["weight"] += (knowledgeImpactFactor) * (abs(sourceKnowledge - destinationKnowledge))
+    G[sourceNodeId][neighbor]["weight"] = max(0, G[sourceNodeId][neighbor]["weight"] + (knowledgeImpactFactor) * (abs(sourceKnowledge - destinationKnowledge)))
     return
+
+
+def deltacon(G1, G2):
+    a1 = (nx.adjacency_matrix(G1))
+    d1 = diags(np.array(a1.sum(0)).flatten(), dtype=float)
+    a2 = (nx.adjacency_matrix(G2))
+    d2 = diags(np.array(a2.sum(0)).flatten(), dtype=float)
+    
+    # Getting Number of Nodes
+    num_nodes = G1.number_of_nodes()
+    
+    # Creating the Groups
+    identity = eye(num_nodes)
+    eps = 0.9
+    nodes = list(range(0,num_nodes))
+    
+    # Declaring the number of groups
+    num_groups = max(int(num_nodes/100), 10)
+    
+    # Random Shuffle of nodes
+    random.shuffle(nodes)
+    groups = [nodes[i::num_groups] for i in range(num_groups)]
+    
+    # Creating the Affinity Matrix
+    s = np.zeros((num_nodes,num_groups))
+    for k in range(num_groups):
+        for i in groups[k]:
+            s[i][k] = 1
+    
+    # Converting all Matrices to CSR Matrix for computation
+    I = csr_matrix(identity)
+    
+    D1 = csr_matrix(d1)
+    A1 = csr_matrix(a1)
+    
+    A2 = csr_matrix(a2)
+    D2 = csr_matrix(d2)
+    
+    # Calculating the Affinity matrices Equation (Ax = b) Here, b = s, A = I+(D1*pow(eps,2))-(A1*eps)
+    S1 = spsolve((I+(D1*pow(eps,2))-(A1*eps)), s)
+    S2 = spsolve((I+(D2*pow(eps,2))-(A2*eps)), s)
+
+    # Calculating Root Euclidean distance
+    d = np.sqrt(np.sum(np.square(np.sqrt(S1)-np.sqrt(S2))))
+    #d = np.sqrt(np.sum(np.sqrt(np.square(S1-S2))))
+    # Calculating similarity score
+    sim = 1/(1+d)
+    return sim
+
+
 
 def getMostInfluentialNode(G, categoryValue):
     # get the subgraph of nodes that have the category value > 0
