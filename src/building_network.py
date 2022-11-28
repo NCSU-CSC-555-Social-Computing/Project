@@ -20,7 +20,7 @@ from scipy.sparse.linalg import spsolve
 
 
 def main():
-    categoryValue = 'fashion'
+    categoryValue = 'barsandrestaurants'
     
     if categoryValue == "":
         print("Please enter category value as input while running the file")
@@ -105,14 +105,47 @@ def main():
 
 
     # perform hypothesis 2
-    hypothesis2(influentialSubgraph, categoryValue)
-
-
+    #hypothesis2(influentialSubgraph, categoryValue)
+    
+    # perform hypothesis 3
+    hypothesis3(influentialSubgraph, categoryValue)
     return    
+    
 
-def hypothesis2(influentialSubgraph, categoryValue):
+
+def hypothesis3(influentialSubgraph, categoryValue):
+    print('In H3')
     nodes = list(influentialSubgraph.nodes())
-    # print(nodes)
+    #print(nodes)
+    G1 = influentialSubgraph.copy()
+    
+    edges_added = []
+    for i in range(len(nodes)-1):
+        for j in range(i+1,len(nodes)-1):
+            source = nodes[i]
+            target = nodes[j]
+            if influentialSubgraph.has_edge(source, target) == False and influentialSubgraph.has_edge(target, source) == False:
+                # create an edge between these 2 nodes with a default w
+                influentialSubgraph.add_edge(source, target, weight = 0.0001)
+                edges_added.append((source, target))
+    
+    visualizeNetworkXGraph(influentialSubgraph, "graph_canvas_before_h3.png")
+    hypothesis1(influentialSubgraph, categoryValue)
+    G2 = influentialSubgraph.copy()
+    
+    
+    for edges in edges_added:
+        G2.remove_edge(edges[0], edges[1])
+    
+    print(nx.adjacency_matrix(G2)-nx.adjacency_matrix(G1))
+    similarity = deltacon(G1, G2)
+    print("Dissimilarity: "+str(1-similarity))
+    visualizeNetworkXGraph(influentialSubgraph, "graph_canvas_after_h3.png")
+    
+    
+def hypothesis2(influentialSubgraph, categoryValue):
+    print('In H2')
+    nodes = list(influentialSubgraph.nodes())
     G1 = influentialSubgraph.copy()
     for i in range(len(nodes)-1):
         source = nodes[i]
@@ -124,8 +157,8 @@ def hypothesis2(influentialSubgraph, categoryValue):
     visualizeNetworkXGraph(influentialSubgraph, "graph_canvas_before_h2.png")
     hypothesis1(influentialSubgraph, categoryValue)
     G2 = influentialSubgraph.copy()
-    print(G1)
-    print(G2)
+    #print(G2)
+    
     similarity = deltacon(G1, G2)
     print(similarity)
     visualizeNetworkXGraph(influentialSubgraph, "graph_canvas_after_h2.png")
@@ -193,7 +226,6 @@ def deltacon(G1, G2):
     d1 = diags(np.array(a1.sum(0)).flatten(), dtype=float)
     a2 = (nx.adjacency_matrix(G2))
     d2 = diags(np.array(a2.sum(0)).flatten(), dtype=float)
-    
     # Getting Number of Nodes
     num_nodes = G1.number_of_nodes()
     
@@ -253,7 +285,11 @@ def getMostInfluentialNode(G, categoryValue):
     subgraph = G.subgraph(nodeListByCategory)
 
     # find the centrality for the subgraph
-    centrality = nx.closeness_centrality(subgraph)
+    #centrality = nx.global_reaching_centrality(subgraph, weight='weight')
+    centrality = {}
+    for node in subgraph.nodes:
+        centrality[node] = nx.local_reaching_centrality(subgraph, node)
+    #print(centrality)
 
     # sort the centrality measures
     centrality = sorted(centrality.items(), key=lambda d: d[1], reverse=True)
